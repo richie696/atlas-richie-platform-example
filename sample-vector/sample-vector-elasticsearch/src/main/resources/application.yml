@@ -1,0 +1,23 @@
+server:
+  port: 9521
+
+spring:
+  application:
+    name: sample-vector-elasticsearch
+
+logging:
+  level:
+    root: info
+    com.richie.component.vector.elasticsearch: debug
+
+platform:
+  component:
+    vector:
+      elasticsearch:
+        hosts: ${ELASTICSEARCH_HOSTS:http://127.0.0.1:9200}
+        username: ${ELASTICSEARCH_USERNAME:elastic}
+        password: ${ELASTICSEARCH_PASSWORD:}
+        index: vectors
+        dimension: 768
+
+

@@ -1,0 +1,39 @@
+server:
+    port: 8080
+
+spring:
+    application:
+        name: sample-storage-local
+    main:
+        allow-bean-definition-overriding: true
+        allow-circular-references: false
+    servlet:
+        multipart:
+            max-file-size: 100MB
+            max-request-size: 100MB
+
+# 本地存储配置
+platform:
+    component:
+        storage:
+            local:
+                enable: true
+                # 本地存储路径，请根据实际情况修改
+                path: /tmp/storage/local
+                cache:
+            local:
+                enable: true
+                # 本地存储路径，从环境变量 LOCAL_STORAGE_PATH 覆盖（默认 /tmp/storage/local）
+                path: ${LOCAL_STORAGE_PATH:/tmp/storage/local}
+                cache:
+                    enable: true
+                    max-size: 1000
+                schema:
+                    auto-create: true
+                cleanup:
+                    enable: false
+                    days: 30
+
+logging:
+    level:
+        com.richie: DEBUG

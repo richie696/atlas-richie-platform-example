@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  sample-nats Maven 模块
+  ============================================================
+  仅依赖 NATS 组件本体(以及 web 层 + 必要的 OTel),
+  不引入消息/缓存/存储等其他组件,保持模块最小可运行。
+
+  关键设计:
+    1) 排除 web → i18n 链路,切断对 Redis 的强依赖
+    2) 显式引入 OTel(因 NATS TracingSupport 接口签名强依赖)
+    3) 显式声明 Lombok 注解处理器(因 example 父 POM 未配置)
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      继承 example 顶层 pom:
+        - 通过 ${revision} 实现多模块统一版本(由 flatten-maven-plugin 解析)
+        - 复用父级 dependencyManagement(spring-boot-bom / OTel-bom / 平台组件版本)
+    -->
+    <parent>
+        <groupId>com.richie.sample</groupId>
+        <artifactId>atlas-richie-platform-example</artifactId>
+        <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>sample-nats</artifactId>
+
+    <dependencies>
+        <!--
+          核心依赖:平台 NATS 组件,提供 NatsComponent(NatsBus / NatsEndpoint / JetStreamBus)
+          自动装配与 NatsProperties / JetStreamProperties 配置绑定。
+        -->
+        <dependency>
+            <groupId>com.richie.component</groupId>
+            <artifactId>atlas-richie-component-nats</artifactId>
+        </dependency>
+
+        <!--
+          Web 组件:提供 Spring MVC 装配、NatsDemoController 才能被 @RestController 解析。
+          sample-nats 自身不使用 i18n / catalog 能力,但 web → i18n → cache → Redisson
+          这条传递链路会要求本机启动 Redis 才能装配。排除 i18n 即可切断链路,
+          让 sample-nats 保持只依赖 NATS。
+        -->
+        <dependency>
+            <groupId>com.richie.component</groupId>
+            <artifactId>atlas-richie-component-web-core</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.richie.component</groupId>
+                    <artifactId>atlas-richie-component-i18n</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.richie.component</groupId>
+            <artifactId>atlas-richie-component-web-tomcat</artifactId>
+        </dependency>
+
+        <!--
+          OpenTelemetry 显式引入。
+          NATS 组件把 OTel 声明为 optional,但 NatsTracingSupport 接口签名强依赖 OTel 类型
+          (返回 io.opentelemetry.api.trace.Span),因此只要启用 NATS 链路追踪就必须提供 OTel。
+          版本由父 BOM(atlas-richie-dependencies)统一管理:opentelemetry-instrumentation-bom 2.27.0
+          对应 opentelemetry-api/context 1.61.0 系列。
+        -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-context</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              显式启用 Lombok 注解处理。
+              example 工程父 POM(atlas-richie-dependencies)的 pluginManagement
+              未配置 annotationProcessorPaths,且 example 顶层 pom 也未继承平台根 pom
+              的 active <plugins>,因此独立编译 sample-nats 时 lombok 不会运行,
+              表现为 @Slf4j / @RequiredArgsConstructor 等注解不生成符号。
+              此处对齐 platform 顶层 pom 851~883 行的配置。
+              同 Spring Boot 配合时还需把 spring-boot-configuration-processor
+              一起加入,否则 @ConfigurationProperties 类的元信息不会生成。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                            <version>${spring-boot.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <!--
+              spring-boot-maven-plugin:
+                1) 收集运行时所有依赖打 fat jar(mvn package)
+                2) mvn spring-boot:run 启动应用,需指定 mainClass
+            -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.richie.component.nats.sample.SampleNatsApplication</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

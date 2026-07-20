@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: sample-document-parser
+  main:
+    banner-mode: off
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true

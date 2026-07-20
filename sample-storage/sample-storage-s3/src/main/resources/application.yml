@@ -1,0 +1,37 @@
+server:
+    port: 8085
+
+spring:
+    application:
+        name: sample-storage-s3
+    main:
+        allow-bean-definition-overriding: true
+        allow-circular-references: false
+    servlet:
+        multipart:
+            max-file-size: 100MB
+            max-request-size: 100MB
+
+# AWS S3存储配置
+platform:
+    component:
+        storage:
+            object:
+                # 存储引擎类型
+                engine: AWS_S3
+                # S3访问域名（环境变量覆盖默认)
+                endpoint: ${AWS_S3_ENDPOINT:s3.us-east-1.amazonaws.com}
+                # 区域
+                region: ${AWS_S3_REGION:us-east-1}
+                # 访问密钥ID（Access Key ID,环境变量: AWS_ACCESS_KEY_ID)
+                access-key-id: ${AWS_S3_ACCESS_KEY_ID:}
+                # 访问密钥（Secret Access Key,环境变量: AWS_SECRET_ACCESS_KEY)
+                access-key-secret: ${AWS_S3_SECRET_ACCESS_KEY:}
+                # 存储桶名称
+                bucket-name: ${AWS_S3_BUCKET_NAME:richie-bucket}
+                # 桶内基础路径（可选）
+                base-path: /storage
+
+logging:
+    level:
+        com.richie: DEBUG

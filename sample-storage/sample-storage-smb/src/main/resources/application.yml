@@ -1,0 +1,37 @@
+server:
+    port: 8090
+
+spring:
+    application:
+        name: sample-storage-smb
+    main:
+        allow-bean-definition-overriding: true
+        allow-circular-references: false
+    servlet:
+        multipart:
+            max-file-size: 100MB
+            max-request-size: 100MB
+
+# SMB存储配置
+platform:
+    component:
+        storage:
+            smb:
+                # 是否启用SMB
+                enable: true
+                # SMB服务器地址（环境变量覆盖)
+                host: ${SMB_HOST:smb://127.0.0.1/share}
+                # 域名（可选，Windows网络环境可能需要）
+                domain: ${SMB_DOMAIN:WORKGROUP}
+                # 用户名（环境变量: SMB_USERNAME)
+                username: ${SMB_USERNAME:}
+                # 密码（环境变量: SMB_PASSWORD,默认空强制注入)
+                password: ${SMB_PASSWORD:}
+                # 基础路径
+                base-path: /upload
+                # 连接超时时间（毫秒）
+                timeout: ${SMB_TIMEOUT:30000}
+
+logging:
+    level:
+        com.richie: DEBUG

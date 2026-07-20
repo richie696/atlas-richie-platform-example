@@ -1,0 +1,37 @@
+server:
+    port: 8084
+
+spring:
+    application:
+        name: sample-storage-obs
+    main:
+        allow-bean-definition-overriding: true
+        allow-circular-references: false
+    servlet:
+        multipart:
+            max-file-size: 100MB
+            max-request-size: 100MB
+
+# 华为云OBS存储配置
+platform:
+    component:
+        storage:
+            object:
+                # 存储引擎类型
+                engine: HUAWEI_OBS
+                # OBS访问域名（示例：obs.cn-north-4.myhuaweicloud.com）
+                endpoint: ${HUAWEI_OBS_ENDPOINT:obs.cn-north-4.myhuaweicloud.com}
+                # 区域
+                region: ${HUAWEI_OBS_REGION:cn-north-4}
+                # 访问密钥ID（Access Key Id,从环境变量 HUAWEI_OBS_ACCESS_KEY_ID 注入)
+                access-key-id: ${HUAWEI_OBS_ACCESS_KEY_ID:}
+                # 访问密钥（Secret Access Key,从环境变量 HUAWEI_OBS_SECRET_ACCESS_KEY 注入)
+                access-key-secret: ${HUAWEI_OBS_SECRET_ACCESS_KEY:}
+                # 存储桶名称
+                bucket-name: ${HUAWEI_OBS_BUCKET_NAME:richie-obs-bucket}
+                # 桶内基础路径（可选）
+                base-path: /storage
+
+logging:
+    level:
+        com.richie: DEBUG

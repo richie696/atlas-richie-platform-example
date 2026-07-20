@@ -1,0 +1,83 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: sample-concurrency
+
+  # 通过 spring.config.import 从 Nacos 加载远端配置(可选,本地无 Nacos 时容错)
+  # server-addr 默认指向 localhost:8848,可通过 -Dnacos.server-addr=... 覆盖
+  config:
+    import:
+      - optional:nacos:sample-concurrency.yaml?refreshEnabled=true
+  cloud:
+    nacos:
+      config:
+        server-addr: ${nacos.server-addr:127.0.0.1:8848}
+        # 远端 group 默认 DEFAULT_GROUP,namespace 默认 public,可按需调整
+        namespace: ${nacos.namespace:public}
+      # 关闭 Nacos Discovery 服务发现(本 sample 只需要 config,不需注册服务)
+      discovery:
+        enabled: false
+
+# ==============================================================================
+# 平台级并发组件配置 (ConcurrencyProperties / RateLimiterProperties / CircuitBreakerProperties)
+# 前缀: platform.concurrency
+# ==============================================================================
+platform:
+  concurrency:
+
+    # ---------- 令牌桶限流器 ----------
+    # 开关设为 true 才会注册 RateLimiter Bean,容器关闭时自动 close()
+    rate-limiter:
+      enabled: true
+      permits-per-second: 5   # 每秒 5 个令牌 (Sample 用小值方便演示)
+
+    # ---------- 熔断器 ----------
+    # failureRateThreshold 是 double (0.0 ~ 1.0),内部 *100 转为 percentage
+    # slidingWindowSize 底层最小为 10 (CircuitBreaker.Builder.windowSize 校验)
+    circuit-breaker:
+      enabled: true
+      failure-rate-threshold: 0.5   # 50% 失败率触发熔断
+      sliding-window-size: 10       # 窗口大小 10 次 (底层最小为 10)
+      wait-duration: 3s             # OPEN 持续 3 秒后转 HALF_OPEN
+      half-open-max-successes: 1    # 当前底层为单次探测语义
+
+    # ---------- 动态线程池(多池) ----------
+    # 每个 key 都是独立的 DynamicExecutor Bean (bean name = key)
+    # queueCapacity / threadNamePrefix 仅启动期生效,不可热更新
+    # 其余字段(corePoolSize / maximumPoolSize / keepAliveTime / rejectedHandler) 可被
+    # ThreadPoolConfigRefresher 热更新
+    thread-pools:
+      order-executor:
+        core-pool-size: 2
+        maximum-pool-size: 4
+        keep-alive-time: 30s
+        queue-capacity: 100
+        thread-name-prefix: "order-pool-"
+        rejected-handler: "AbortPolicy"
+
+      notification-executor:
+        core-pool-size: 1
+        maximum-pool-size: 2
+        keep-alive-time: 60s
+        queue-capacity: 50
+        thread-name-prefix: "notify-pool-"
+        rejected-handler: "CallerRunsPolicy"
+
+      audit-executor:
+        core-pool-size: 1
+        maximum-pool-size: 2
+        keep-alive-time: 60s
+        queue-capacity: 20                # 小队列:Sample 演示拒绝计数时使用
+        thread-name-prefix: "audit-pool-"
+        rejected-handler: "AbortPolicy"   # 抛 RejectedExecutionException
+
+# ==============================================================================
+# 日志
+# ==============================================================================
+logging:
+  level:
+    root: INFO
+    com.richie.component.concurrency: DEBUG
+    com.richie.component.concurrency.demos: INFO

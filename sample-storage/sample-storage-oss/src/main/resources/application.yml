@@ -1,0 +1,37 @@
+server:
+    port: 8082
+
+spring:
+    application:
+        name: sample-storage-oss
+    main:
+        allow-bean-definition-overriding: true
+        allow-circular-references: false
+    servlet:
+        multipart:
+            max-file-size: 100MB
+            max-request-size: 100MB
+
+# 阿里云OSS存储配置
+platform:
+    component:
+        storage:
+            object:
+                # 存储引擎类型
+                engine: ALIYUN_OSS
+                # OSS访问域名（环境变量覆盖)
+                endpoint: ${ALIYUN_OSS_ENDPOINT:oss-cn-hangzhou.aliyuncs.com}
+                # 区域
+                region: ${ALIYUN_OSS_REGION:cn-hangzhou}
+                # 访问密钥ID（环境变量: ALIYUN_ACCESS_KEY_ID)
+                access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:}
+                # 访问密钥（环境变量: ALIYUN_ACCESS_KEY_SECRET)
+                access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:}
+                # 存储桶名称
+                bucket-name: ${ALIYUN_OSS_BUCKET_NAME:richie-bucket}
+                # 桶内基础路径（可选）
+                base-path: /storage
+
+logging:
+    level:
+        com.richie: DEBUG

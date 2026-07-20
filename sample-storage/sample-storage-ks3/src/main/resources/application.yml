@@ -1,0 +1,37 @@
+server:
+    port: 8086
+
+spring:
+    application:
+        name: sample-storage-ks3
+    main:
+        allow-bean-definition-overriding: true
+        allow-circular-references: false
+    servlet:
+        multipart:
+            max-file-size: 100MB
+            max-request-size: 100MB
+
+# 金山云KS3存储配置
+platform:
+    component:
+        storage:
+            object:
+                # 存储引擎类型
+                engine: KSYUN_KS3
+                # KS3访问域名（示例：ks3-cn-beijing.ksyuncs.com）
+                endpoint: ${KSYUN_KS3_ENDPOINT:ks3-cn-beijing.ksyuncs.com}
+                # 区域
+                region: ${KSYUN_KS3_REGION:cn-beijing}
+                # 访问密钥ID（Access Key ID,从环境变量 KSYUN_KS3_ACCESS_KEY_ID 注入)
+                access-key-id: ${KSYUN_KS3_ACCESS_KEY_ID:}
+                # 访问密钥（Secret Access Key,从环境变量 KSYUN_KS3_SECRET_ACCESS_KEY 注入)
+                access-key-secret: ${KSYUN_KS3_SECRET_ACCESS_KEY:}
+                # 存储桶名称
+                bucket-name: ${KSYUN_KS3_BUCKET_NAME:richie-ks3-bucket}
+                # 桶内基础路径（可选）
+                base-path: /storage
+
+logging:
+    level:
+        com.richie: DEBUG

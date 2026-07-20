@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  sample-nats 日志配置
+  ------------------------------------------------------------
+  基于 Spring Boot 默认 Logback 配置(通过 include 继承),
+  在父配置基础上覆盖:
+    1) 日志文件输出位置(按应用名分目录)
+    2) 滚动策略保留天数(演示环境短保留)
+    3) 控制台/文件日志格式(注入 traceId / spanId 便于排障)
+-->
+<configuration debug="false">
+    <!-- 从 Spring Environment 读取 spring.application.name,供 LOG_PATH 使用 -->
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name"/>
+
+    <!--
+      继承 Spring Boot 默认的 Logback 基础配置:
+        - 默认 console appender(CONSOLE_LOG_PATTERN 覆盖后生效)
+        - 默认 RollingFileDaily 滚动文件 appender(FILE_LOG_PATTERN 覆盖后生效)
+      该 base.xml 中已经引用了 CONSOLE_LOG_PATTERN / FILE_LOG_PATTERN 变量,
+      因此下面只需定义同名 property 即可实现覆盖。
+    -->
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+
+    <!--
+      日志文件保存位置:
+        Mac/Linux  =>  /Users/<user>/logs/sample-nats
+        Windows    =>  C:\Users\<user>\logs\sample-nats
+      按应用名拆分目录,方便多模块共机部署时区分。
+    -->
+    <property name="LOG_PATH" value="${user.home}/logs/${APP_NAME}"/>
+
+    <!--
+      日志滚动保留天数:演示环境 1 天即可,云上一般会把日志投递到日志服务
+      (Loki / ELK / SLS),本机不需要长期保留。
+    -->
+    <property name="LOGBACK_ROLLINGPOLICY_MAX_HISTORY" value="1"/>
+
+    <!--
+      控制台日志输出格式:
+        %d{HH:mm:ss}            时间(时分秒,演示环境够用)
+        [%thread]               线程名
+        %-5level                日志级别(左对齐,占 5 列)
+        %logger{10}             类名缩写(超长时首段缩写)
+        [traceId=... spanId=..] OTel 上下文中的 traceId/spanId
+                                用于串联分布式调用链;未启用追踪时为空字符串
+        %msg%n                  业务消息正文
+    -->
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%d{HH:mm:ss} [%thread] %-5level %logger{10} [traceId=%X{trace_id} spanId=%X{span_id}] %msg%n"/>
+
+    <!--
+      文件日志输出格式:与控制台保持一致,
+      方便开发者在文件和控制台之间切换阅读。
+    -->
+    <property name="FILE_LOG_PATTERN"
+              value="%d{HH:mm:ss} [%thread] %-5level %logger{10} [traceId=%X{trace_id} spanId=%X{span_id}] %msg%n"/>
+</configuration>

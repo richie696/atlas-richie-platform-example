@@ -1,0 +1,64 @@
+# ============================================================
+# sample-nats 应用主配置
+# ------------------------------------------------------------
+# 该文件只放"通用应用配置",所有 NATS 相关配置全部下沉到
+# application-nats.yml,spring.profiles.include=nats 自动激活。
+# 这样设计的好处:NATS 相关配置(连接地址、JetStream、Header
+# 透传等)集中管理,方便在不同环境下整体替换。
+# ============================================================
+
+spring:
+    # ----- 应用元信息 -----
+    application:
+        # 应用名:影响日志目录 ${user.home}/logs/${spring.application.name}
+        # 以及 OpenTelemetry 资源属性 service.name
+        name: sample-nats
+    # ----- Profile 激活 -----
+    profiles:
+        # 引入独立的 nats profile,所有 NATS 相关配置在 application-nats.yml
+        include: nats
+    main:
+        # 允许 Bean 定义覆盖:平台组件内部可能注册同名 Bean,显式允许覆盖避免启动失败
+        allow-bean-definition-overriding: true
+        # 允许循环引用:Web 组件链路中存在自引用场景,需显式开启
+        allow-circular-references: true
+    mvc:
+        pathmatch:
+            # 使用 Ant 风格路径匹配(默认 PathPatternParser 在 Spring 6 启用,
+            # 切到 ant_path_matcher 可保持与平台既有 URL 处理方式兼容)
+            matching-strategy: ant_path_matcher
+        format:
+            # 全局 @DateTimeFormat 默认值,API 入参/出参未指定格式时使用该值
+            date-time: yyyy-MM-dd HH:mm:ss
+
+# ----- 内嵌服务器配置 -----
+server:
+    # 应用监听端口(REST API 与 Actuator 共用)
+    port: 8892
+    undertow:
+        threads:
+            # Undertow worker 线程数,根据并发量按需调整
+            worker: 200
+
+# ----- Spring Boot Actuator 暴露配置 -----
+management:
+    endpoints:
+        web:
+            exposure:
+                # 仅暴露运维常用的端点,避免敏感信息(heapdump/env)被意外开启
+                include: "health,info,metrics,prometheus"
+    endpoint:
+        health:
+            # 健康检查详情可见,便于排查
+            show-details: always
+            # 匿名访问,演示环境不做鉴权;生产环境务必改为 restricted
+            access: unrestricted
+        metrics:
+            access: unrestricted
+        prometheus:
+            access: unrestricted
+    prometheus:
+        metrics:
+            export:
+                # 启用 Prometheus 指标导出,供 Prometheus 抓取
+                enabled: true

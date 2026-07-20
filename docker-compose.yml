@@ -1,0 +1,69 @@
+version: '3.8'
+
+# Richie Platform Example 工程的本地基础设施编排
+# 当前包含:
+#   - nats:    NATS 2.10-alpine + JetStream(sample-nats / 未来其它 NATS 演示共用)
+#   - nui:     NATS 官方 Web 管理界面
+#
+# 启动: docker-compose up -d
+# 停止: docker-compose down
+# 清理数据: docker-compose down -v
+
+services:
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: richie-nats
+    restart: unless-stopped
+    command:
+      - "-js"
+      - "-m"
+      - "8222"
+    ports:
+      - "4222:4222"   # 客户端连接
+      - "8222:8222"   # HTTP 监控 API(/varz /jsz /connz /subsz)
+    volumes:
+      - nats_data:/data/jetstream    # JetStream 持久化
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - richie-infra
+
+  nui:
+    # NATS 官方 Web 管理界面
+    # 文档: https://github.com/nats-nui/nui
+    image: ghcr.io/nats-nui/nui:latest
+    container_name: richie-nats-nui
+    restart: unless-stopped
+    depends_on:
+      nats:
+        condition: service_healthy
+    environment:
+      # NUI 通过容器网络连接 NATS(不是 localhost)
+      - NUI_NATS_URL=nats://nats:4222
+      - NUI_NATS_NAME=nats-local
+      - NUI_HOST=0.0.0.0
+      - NUI_PORT=31311
+      # 持久化 NUI 自身配置(账户、收藏等)
+      - NUI_DATABASE_URL=file:/data/nui-db.sqlite
+    ports:
+      - "31311:31311" # Web UI
+    volumes:
+      - nui_db:/data
+    networks:
+      - richie-infra
+
+volumes:
+  nats_data:
+    name: richie_nats_data
+  nui_db:
+    name: richie_nui_db
+
+networks:
+  richie-infra:
+    name: richie-infra
+    driver: bridge

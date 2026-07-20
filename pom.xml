@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.richie.base</groupId>
+        <artifactId>atlas-richie-dependencies</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath />
+    </parent>
+
+    <groupId>com.richie.sample</groupId>
+    <artifactId>atlas-richie-platform-example</artifactId>
+    <version>${revision}</version>
+    <description>Richie中台组件Demo工程</description>
+    <packaging>pom</packaging>
+
+
+    <modules>
+        <module>sample-cache</module>
+        <module>sample-cache-stream-dlq</module>
+        <module>sample-concurrency</module>
+        <module>sample-http</module>
+        <module>sample-messaging</module>
+        <module>sample-mqtt-client</module>
+        <module>sample-mqtt-server</module>
+        <module>sample-storage</module>
+        <!--
+          sample-threadpool: BOM 中缺少 atlas-richie-component-threadpool,
+          且源码 import 了第三方 org.dromara.dynamictp.*,本地仓库无此依赖。
+          暂从构建中移除,源码与 pom 文件保留作为未来组件补齐后的模板。
+        -->
+        <module>sample-ai</module>
+        <module>sample-mongodb</module>
+        <module>sample-nats</module>
+        <module>sample-vector</module>
+        <module>sample-logging</module>
+        <module>sample-mfa</module>
+        <module>sample-desensitize</module>
+        <module>sample-web</module>
+        <module>sample-document-parser</module>
+    </modules>
+
+    <properties>
+        <revision>1.0.0-SNAPSHOT</revision>
+        <!-- 跳过部署；子模块允许 install 到本地仓库，供分包 sample 互相依赖（IDE/单模块构建） -->
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.richie.component</groupId>
+                <artifactId>atlas-richie-component-dependencies</artifactId>
+                <version>${middle.platform.version}</version>
+                <scope>import</scope>
+                <type>pom</type>
+            </dependency>
+            <!-- 分包 sample 内部依赖统一版本，避免子模块单独构建时版本解析不一致 -->
+            <dependency>
+                <groupId>com.richie.sample</groupId>
+                <artifactId>sample-http-core</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.richie.sample</groupId>
+                <artifactId>sample-messaging-core</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.richie.sample</groupId>
+                <artifactId>sample-vector-core</artifactId>
+                <version>${revision}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- 注意：作为父 POM（packaging=pom），不应该有 dependencies 配置 -->
+    <!-- build 仅用于 flatten-maven-plugin，与平台根 POM 的版本控制方式一致 -->
+
+    <build>
+        <plugins>
+            <!--
+              注解处理器全局配置:Lombok + MapStruct + spring-boot-configuration-processor。
+              父 BOM (atlas-richie-dependencies) 的 pluginManagement 未声明 annotationProcessorPaths,
+              若不在此启用,所有 sample-* 模块的 @Slf4j / @Data / @RequiredArgsConstructor / @Accessors
+              等注解不会生成符号,导致 javac 报"找不到符号 log / getter / setter"。
+
+              子模块若需要扩展 compilerArgs,只需在自己的 <build><plugins> 中覆盖 maven-compiler-plugin,
+              Maven 对 <annotationProcessorPaths> 这种 list-typed 配置默认会与父级合并,
+              因此 sample-mfa / sample-nats 现有的本地 annotationProcessorPaths 仍会生效。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                            <version>${spring-boot.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <!-- 仅跳过 deploy，避免 sample 进入私服；允许 install 到本地仓库，供分包 sample 互相依赖 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+
+            <!-- 与平台一致：使用 flatten-maven-plugin 解析 ${revision}，由全局 revision 控制版本号 -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.7.3</version>
+                <configuration>
+                    <flattenMode>oss</flattenMode>
+                    <updatePomFile>true</updatePomFile>
+                    <pomElements>
+                        <parent>expand</parent>
+                        <groupId>expand</groupId>
+                        <artifactId>expand</artifactId>
+                        <version>expand</version>
+                        <dependencies>expand</dependencies>
+                        <dependencyManagement>expand</dependencyManagement>
+                        <properties>expand</properties>
+                    </pomElements>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

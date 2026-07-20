@@ -1,0 +1,84 @@
+server:
+  port: 8081
+  tomcat:
+    threads:
+      max: 200           # 生产调优：业务线程池
+      min-spare: 20
+    accept-count: 200
+    max-connections: 8192
+    connection-timeout: 30s
+
+spring:
+  application:
+    name: sample-web-tomcat
+  main:
+    banner-mode: off
+  jackson:
+    default-property-inclusion: non_null
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      app: ${spring.application.name}
+      container: tomcat
+
+platform:
+  component:
+    web:
+      rate-limit:
+        enabled: true
+        permits-per-second: 5
+        deny-status: 429
+        deny-code: RATE_LIMITED
+        deny-msg: "tomcat 请求过于频繁 (key={key})"
+        routes:
+          - pattern: "/orders/**"
+            permits-per-second: 2
+            deny-code: ORDER_RATE_LIMITED
+            deny-msg: "tomcat 下单过快"
+      circuit-breaker:
+        enabled: true
+        failure-rate-threshold: 50
+        sliding-window-duration: 20s
+        deny-status: 503
+        deny-code: CIRCUIT_OPEN
+        deny-msg: "tomcat 服务熔断中"
+        routes:
+          - pattern: "/payments/**"
+            failure-rate-threshold: 30
+            sliding-window-duration: 10s
+            deny-code: PAYMENT_CB_OPEN
+            deny-msg: "tomcat 支付服务熔断"
+      degrade:
+        enabled: true
+        fallback:
+          status: 503
+          code: DEGRADED
+          msg: "tomcat 服务降级中 ({reason})"
+      protection:
+        anomaly-detection:
+          enabled: true
+          bot-user-agents: ["curl/*"]
+          deny-status: 403
+          deny-code: BOT_DETECTED
+          deny-msg: "tomcat 检测到 Bot UA"
+        brute-force:
+          enabled: true
+          window-seconds: 60
+          max-attempts: 5
+          lockout-seconds: 60
+          deny-status: 429
+          deny-code: BRUTE_FORCE
+          deny-msg: "tomcat 登录尝试过于频繁，已锁定 {lockout} 秒"
+      hang-detection:
+        enabled: true
+        warn-ms: 1000
+        dump-ms: 5000
+        kill-switch-ms: 30000

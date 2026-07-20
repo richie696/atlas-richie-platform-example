@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.richie.sample</groupId>
+        <artifactId>atlas-richie-platform-example</artifactId>
+        <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>sample-concurrency</artifactId>
+    <name>sample-concurrency</name>
+    <description>
+        atlas-richie-component-concurrency 组件的端到端示例工程，覆盖：
+        1) 结构化并发（StructuredConcurrency 8 种模式）
+        2) 虚拟线程工厂（VirtualThreadFactory + ScopedValue）
+        3) 批处理器（BatchProcessor.forEach / mapParallel）
+        4) 限流（RateLimiter 三档等待 + 多 token）
+        5) 熔断（CircuitBreaker 三态机）
+        6) 防抖（Debouncer）
+        7) 重试（Retryer 指数退避 + jitter + fallback）
+        8) 动态线程池（DynamicExecutor 多池 + 热更新 + 拒绝计数）  ⭐
+        9) Registry（按 key 缓存的限流器 / 熔断器注册中心）
+    </description>
+
+    <properties>
+        <!-- 并发组件使用 JDK 25 特性：StructuredTaskScope、ScopedValue、虚拟线程工厂 -->
+        <java.version>25</java.version>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+        <maven.compiler.release>25</maven.compiler.release>
+        <main.class>com.richie.component.concurrency.SampleConcurrencyApplication</main.class>
+    </properties>
+
+    <dependencies>
+        <!-- 组件核心依赖 -->
+        <dependency>
+            <groupId>com.richie.component</groupId>
+            <artifactId>atlas-richie-component-concurrency</artifactId>
+        </dependency>
+
+        <!-- Spring Boot 启动器（运行时需要，组件 pom 中是 provided） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Web:启动后 Tomcat 监听 8080,所有 demo 通过 controller 暴露 HTTP 端点触发 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Nacos 配置中心:通过 spring.config.import 加载 platform.concurrency.* 远端配置 -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+
+        <!-- 测试依赖：Spring Boot Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- 编译期开启预览特性（虚拟线程 / StructuredTaskScope / ScopedValue） -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <release>${java.version}</release>
+                    <compilerArgs>
+                        <arg>--enable-preview</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+
+            <!-- 测试期开启预览特性 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>--enable-preview</argLine>
+                </configuration>
+            </plugin>
+
+            <!-- Spring Boot 可执行 fat jar 打包 + 运行时 JVM 参数 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <mainClass>${main.class}</mainClass>
+                    <!-- 并发组件使用 JDK 25 preview 特性(StructuredTaskScope / ScopedValue / 虚拟线程),
+                         spring-boot:run 不会自动从 compiler-plugin 继承 enable-preview 标志,
+                         必须显式传给 fork JVM -->
+                    <jvmArguments>--enable-preview</jvmArguments>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

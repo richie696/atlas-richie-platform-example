@@ -1,0 +1,121 @@
+# ============================================================
+# NATS 组件配置(由 spring.profiles.include=nats 自动加载)
+# ------------------------------------------------------------
+# 平台所有 NATS 相关配置都挂在 platform.nats.* 命名空间下,
+# 由 atlas-richie-component-nats 通过 @ConfigurationProperties 绑定。
+# 这里的所有字段都会映射到 NatsProperties / JetStreamProperties。
+# ============================================================
+
+platform:
+    nats:
+        # ----- 总开关 -----
+        # false 时整个 NATS 组件不装配(连接、Stream、Consumer、REST 演示都不会生效)
+        enabled: true
+
+        # ----- 服务端地址 -----
+        # 默认连接本地 docker-compose 启动的 NATS:
+        #   - 客户端端口 4222
+        #   - HTTP 监控端口 8222(curl http://localhost:8222/varz)
+        #   - JetStream 监控:    curl http://localhost:8222/jsz
+        #   - NUI 管理界面:      http://localhost:31311
+        # 生产环境可通过环境变量 NATS_SERVER 覆盖,例如:
+        #   NATS_SERVER=nats://nats-prod.svc.cluster.local:4222
+        server: ${NATS_SERVER:nats://localhost:4222}
+
+        # ----- 链路追踪 -----
+        # 启用后 NATS 的 publish/subscribe/request 都会包裹 OpenTelemetry Span,
+        # 关闭可避免引入 OTel 相关依赖(但 sample-nats 仍强制引入,见 pom.xml)
+        tracing:
+            enabled: true
+
+        # ----- Header 透传白名单 -----
+        # 哪些 HTTP Header 会从入站请求复制到 NATS Message Header,
+        # 跨服务调用时自动带过去。常用于多租户/灰度/i18n 场景。
+        header-propagation:
+            enabled: true
+            headers:
+                - x-tenant-id              # 多租户 ID
+                - x-rd-request-timezone    # 请求方时区
+                - x-rd-request-language    # 请求方语言
+                - x-rd-canary-tag          # 灰度标签
+
+        # ----- JetStream 持久化层 -----
+        # 启用后 JetStreamBus / Stream / Consumer 会被自动装配;
+        # auto-provision=true 时启动时按下面的声明创建资源(已存在则忽略)。
+        jetstream:
+            enabled: true
+            # 启动时自动声明 stream 与 consumer
+            # 生产环境如需禁用(由 ops 手工管理),改为 false
+            auto-provision: true
+
+            # ----- Stream 声明 -----
+            # 同一 Stream 可承载多个 subject(用 subjects 数组列出),
+            # Consumer 再以 filter-subject 进一步过滤。
+            streams:
+                -   name: ORDERS
+                    subjects:
+                        # 该 Stream 接收 orders.persistent 主题消息
+                        - orders.persistent
+                    # 存储后端:file(磁盘)或 memory(内存)
+                    # 生产推荐 file,NATS 容器重启后消息可恢复
+                    storage-type: file
+                    # 保留策略:limits 按 max-age/max-bytes 截断;
+                    #   interest 按消费者兴趣;work-queue 队列模式
+                    retention: limits
+                    # 消息最大保留时长(7 天后自动过期)
+                    max-age: 7d
+                    # 最大消息数 -1 = 不限制
+                    max-messages: -1
+                    # 最大占用字节 -1 = 不限制
+                    max-bytes: -1
+                    # 副本数(单节点测试用 1,生产 RAFT 集群建议 3)
+                    num-replicas: 1
+                    # 满限策略:old 丢弃最旧;new 拒绝最新写入
+                    discard: old
+
+                    # ----- Stream 内的 Consumer 声明 -----
+                    # 多个 consumer 共享同一份消息流、各自维护消费位点。
+                    consumers:
+                        -   name: order-consumer-continuous
+                            # push:服务端主动推送,适合持续消费
+                            type: push
+                            # 只消费该 subject 的消息
+                            filter-subject: orders.persistent
+                            # 显式 ack 模式:Handler 正常返回 -> ack,抛异常 -> nak
+                            ack-policy: explicit
+                            # 等待 ack 的最长时间,超时未 ack 服务端会重投
+                            ack-wait: 30s
+                            # 最大重投次数(达到后消息进入 Terminated 状态,停止再投递)
+                            # 注意:NATS advisory 范式 DLQ 已由 atlas-richie-component-nats 框架接管(详见 platform.nats.dlq 配置),业务 0 改动
+                            max-deliver: 3
+                            # 投递策略:all 从头开始;last/last-per-subject 仅新消息
+                            deliver-policy: all
+                            # 重放策略:instant 立即开始
+                            replay-policy: instant
+
+                        -   name: order-consumer-pull
+                            # pull:客户端按需拉取,适合批处理
+                            type: pull
+                            # 只消费该 subject 的消息
+                            filter-subject: orders.persistent
+                            # 显式 ack 模式:Handler 正常返回 -> ack,抛异常 -> nak
+                            ack-policy: explicit
+                            # 等待 ack 的最长时间,超时未 ack 服务端会重投
+                            ack-wait: 30s
+                            # 最大重投次数(达到后消息进入 Terminated 状态,停止再投递)
+                            # 注意:NATS advisory 范式 DLQ 已由 atlas-richie-component-nats 框架接管(详见 platform.nats.dlq 配置),业务 0 改动
+                            max-deliver: 3
+                            # 投递策略:all 从头开始;last/last-per-subject 仅新消息
+                            deliver-policy: all
+                            # 重放策略:instant 立即开始
+                            replay-policy: instant
+
+        # ----- DLQ(死信队列)配置 — opt-in,本组件 advisory 范式 -----
+        # 绑定路径:platform.nats.dlq.*(与 NatsProperties.Dlq 顶层 @NestedConfigurationProperty 对齐)
+        # 当业务 handler 抛异常超过 ConsumerDefinition.max-deliver 后,
+        # 框架自动 copy 原消息到 <business>-dlq 流并 erase 源 stream 中死信。
+        # 业务侧 0 改动。
+        dlq:
+            enabled: true              # 显式开启(默认 false, opt-in)
+            stream-name-suffix: -dlq   # 业务 stream ORDERS → DLQ stream ORDERS-dlq
+            subject-suffix: .dlq       # 业务 subject orders.persistent → DLQ subject orders.persistent.dlq
